@@ -1,0 +1,26 @@
+{"name":"hippogriff",
+"version":"0.0.1",
+"description":"Hippogriff is a Unicorn for NodeJS that uses *nix sockets to control it's worker processes",
+"homepage":"",
+"author":"Paul Bergeron <paul.d.bergeron@gmail.com>",
+"contributors":["Paul Bergeron"],
+"keywords":["process","workers","management","http","unicorn"],
+"main":"./lib/hippogriff.js",
+"engines":{
+  "node":">= 0.4.8"
+  },
+"dependencies":{
+  },
+"devDependencies":{
+  "coffee-script":"1.1.X",
+  "nodeunit":"0.5.X"
+  },
+"repository":{
+  "type":"git",
+  "url":"git@github.com:dinedal/hippogriff.git"
+  },
+"bugs":{
+  "url":""
+  },
+"licenses":[]
+}
