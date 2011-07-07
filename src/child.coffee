@@ -16,13 +16,15 @@ Child.prototype.fly = () ->
   socket.connect process.env['_HIPPOGRIFF_SOCKET'], () ->
     socket.write "HELLO MY NAME IS #{process.pid}" + '\n'
     socket.on 'data', (data) ->
+      console.log "#{process.pid} - Got Data #{data.toString()}"
       data = data.toString()
       lines = data.split '\n'
       for line in lines
         if line == 'PING'
           if cntr == 0
             socket.write("PONG #{process.pid}" + '\n')
-            # cntr++
+        # if line == "GO AWAY #{process.pid}"
+        #   this.land()
 
 
 Child.prototype.land = () ->
