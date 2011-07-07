@@ -59,7 +59,23 @@ exports.master = (path_to_worker, path_to_config) ->
   process.on 'SIGTERM', quickshutdown
   
   process.on 'SIGQUIT', () ->
-    # Gracefully shutdown all workers and then quit
+    console.log 'SIGQUIT'
+    for worker of workers
+      if workers[worker].socket?
+        workers[worker].socket.write "GO AWAY #{worker}" + '\n'
+      else
+        # No way to communicate
+        workers[worker].handle.kill("SIGKILL")
+        delete workers[worker]
+    counter = 3
+    process.nextTick setInterval (() ->
+      counter--
+      console.log util.inspect workers
+      if counter == 0
+        quickshutdown()
+      else if Object.keys(workers).length == 0
+        process.exit 0
+    ), config.checkInterval
     # TBD
   
   process.on 'SIGUSR1', () ->
@@ -97,7 +113,6 @@ startWorker = (config, path_to_worker) ->
     # socket = new net.Socket()
     
     net.createServer((socket) ->
-      console.log "here"
       socket.on 'data', (data) ->
         data = data.toString()
         console.log data

@@ -23,8 +23,9 @@ Child.prototype.fly = () ->
         if line == 'PING'
           if cntr == 0
             socket.write("PONG #{process.pid}" + '\n')
-        # if line == "GO AWAY #{process.pid}"
-        #   this.land()
+        if line == "GO AWAY #{process.pid}"
+          console.log "okay"
+          # this.land()
 
 
 Child.prototype.land = () ->
