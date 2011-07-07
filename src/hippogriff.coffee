@@ -30,7 +30,7 @@ exports.master = (path_to_worker, path_to_config) ->
       data = data.toString()
       if data[0..4] == "PONG "
         workers[data[5..-2]].status = "okay"
-      else if data[0..13] == "GOODBYE FROM "
+      else if data[0..12] == "GOODBYE FROM "
         delete workers[data[13..-2]]
     socket = c
   
