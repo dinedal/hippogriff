@@ -13,9 +13,9 @@ util.inherits Child, events.EventEmitter
 
 Child.prototype.fly = () ->
   cntr = 0
-  socket.connect process.env['_HIPPOGRIFF_SOCKET'], () ->
+  socket.connect process.env['_HIPPOGRIFF_SOCKET'], () =>
     socket.write "HELLO MY NAME IS #{process.pid}" + '\n'
-    socket.on 'data', (data) ->
+    socket.on 'data', (data) =>
       console.log "#{process.pid} - Got Data #{data.toString()}"
       data = data.toString()
       lines = data.split '\n'
@@ -25,7 +25,7 @@ Child.prototype.fly = () ->
             socket.write("PONG #{process.pid}" + '\n')
         if line == "GO AWAY #{process.pid}"
           console.log "okay"
-          # this.land()
+          this.land()
 
 
 Child.prototype.land = () ->

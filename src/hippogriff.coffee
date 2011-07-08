@@ -4,8 +4,8 @@ path = require 'path'
 net = require 'net'
 {spawn} = require 'child_process'
 
-process.on 'uncaughtException', (err) ->
-  console.err 'Caught exception: ' + '\n' + util.inspect(err.stack, false, 6)
+# process.on 'uncaughtException', (err) ->
+#   console.err 'Caught exception: ' + '\n' + util.inspect(err.stack, false, 6)
 
   
 workers = {}
@@ -31,20 +31,29 @@ exports.master = (path_to_worker, path_to_config) ->
     startWorker config, path_to_worker
   
   # Monitoring of children
-  setInterval (() ->
-    new_workers = []
+  monitorChildren = () ->
+    setInterval (() ->
+      new_workers = []
+      for worker of workers
+        console.log workers[worker].socket.destroyed
+        if workers[worker].status == "concerned"
+          console.log "Worker #{worker} failed to respond, SIGKILLing..."
+          workers[worker].handle.kill("SIGKILL")
+          new_workers.push workers[worker]
+          delete workers[worker]
+        else if workers[worker].status == "okay"
+          workers[worker].socket.write 'PING\n' if workers[worker].socket?
+          workers[worker].status = "concerned"
+      for new_worker in new_workers
+        startWorker(new_worker.config, new_worker.path_to_worker)
+    ), config.checkInterval
+  
+  child_watcher_id = monitorChildren()
+  
+  forceWorkerShutdown = (callback) ->
     for worker of workers
-      if workers[worker].status == "concerned"
-        console.log "Worker #{worker} failed to respond, SIGKILLing..."
-        workers[worker].handle.kill("SIGKILL")
-        new_workers.push workers[worker]
-        delete workers[worker]
-      else
-        workers[worker].socket.write 'PING\n' if workers[worker].socket?
-        workers[worker].status = "concerned"
-    for new_worker in new_workers
-      startWorker(new_worker.config, new_worker.path_to_worker)
-  ), config.checkInterval
+      workers[worker].handle.kill("SIGKILL")
+    callback()
   
   # Match Unicorn's signal handling
   process.on 'SIGHUP', () ->
@@ -52,31 +61,39 @@ exports.master = (path_to_worker, path_to_config) ->
     # TBD
   
   quickshutdown = () ->
-    for worker of workers
-      workers[worker].handle.kill("SIGKILL")
-    process.exit 0
+    forceWorkerShutdown () ->
+      process.exit 0
+  
   process.on 'SIGINT', quickshutdown
   process.on 'SIGTERM', quickshutdown
   
   process.on 'SIGQUIT', () ->
-    console.log 'SIGQUIT'
+    console.log 'SIGQUIT - Asking workers to shutdown and then shutting down...'
+    clearInterval(child_watcher_id)
     for worker of workers
       if workers[worker].socket?
-        workers[worker].socket.write "GO AWAY #{worker}" + '\n'
+        workers[worker].status = "quitting"
+        # console.log workers[worker].socket.destroyed
+        console.log workers[worker].socket.write("GO AWAY #{worker}" + '\n')
+        # console.log util.inspect fs.statSync workers[worker].socket.server.path
+        # fs.statSync
+        buff = new Buffer "GO AWAY #{worker}" + '\n'
+        # fs.writeSync workers[worker].socket.fd, buff, 0, buff.length, 1
+        # process.nextTick(workers[worker].socket.write("GO AWAY #{worker}" + '\n'))
       else
         # No way to communicate
         workers[worker].handle.kill("SIGKILL")
         delete workers[worker]
     counter = 3
-    process.nextTick setInterval (() ->
-      counter--
-      console.log util.inspect workers
-      if counter == 0
-        quickshutdown()
-      else if Object.keys(workers).length == 0
-        process.exit 0
-    ), config.checkInterval
-    # TBD
+    # process.nextTick setInterval (() ->
+    #   console.log counter
+    #   counter--
+    #   if counter == 0
+    #     forceWorkerShutdown () ->
+    #       process.exit -1
+    #   else if Object.keys(workers).length == 0
+    #     process.exit 0
+    # ), config.checkInterval
   
   process.on 'SIGUSR1', () ->
     # Reopen all log files
