@@ -2,7 +2,6 @@ net = require 'net'
 util = require 'util'
 events = require('events')
 
-socket = new net.Socket()
 
 
 Child = () ->
@@ -13,8 +12,9 @@ util.inherits Child, events.EventEmitter
 
 Child.prototype.fly = () ->
   cntr = 0
-  socket.connect process.env['_HIPPOGRIFF_SOCKET'], () =>
-    socket.write "HELLO MY NAME IS #{process.pid}" + '\n'
+  console.log "here"
+  net.createServer((socket) =>
+    @socket = socket
     socket.on 'data', (data) =>
       console.log "#{process.pid} - Got Data #{data.toString()}"
       data = data.toString()
@@ -26,11 +26,18 @@ Child.prototype.fly = () ->
         if line == "GO AWAY #{process.pid}"
           console.log "okay"
           this.land()
+  ).listen(process.env['_HIPPOGRIFF_SOCKET'])
+  master_socket = new net.Socket()
+  console.log process.env['_HIPPOGRIFF_MASTER_SOCKET']
+  master_socket.connect process.env['_HIPPOGRIFF_MASTER_SOCKET'], () ->
+    console.log "writing hello"
+    master_socket.write "HELLO MY NAME IS #{process.pid}" + '\n'
+    master_socket.end()
 
 
 Child.prototype.land = () ->
-  socket.write("GOODBYE FROM #{process.pid}" + '\n')
-  socket.end()
+  @socket.write("GOODBYE FROM #{process.pid}" + '\n')
+  @socket.end()
   callback = (code) -> process.exit code
   this.emit "exit", callback
   
