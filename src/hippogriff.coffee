@@ -98,7 +98,6 @@ exports.master = (path_to_worker, path_to_config) ->
       if workers[worker].socket?
         console.log "Quitting #{worker}"
         workers[worker].status = "quitting"
-        console.log util.inspect workers[worker].socket
         workers[worker].socket.write("GO AWAY #{worker}" + '\n')
         workers[worker].socket.end()
       else
@@ -106,15 +105,14 @@ exports.master = (path_to_worker, path_to_config) ->
         workers[worker].handle.kill("SIGKILL")
         delete workers[worker]
     counter = 3
-    # process.nextTick setInterval (() ->
-    #   console.log counter
-    #   counter--
-    #   if counter == 0
-    #     forceWorkerShutdown () ->
-    #       process.exit -1
-    #   else if Object.keys(workers).length == 0
-    #     process.exit 0
-    # ), config.checkInterval
+    setInterval (() ->
+      counter--
+      if counter == 0
+        forceWorkerShutdown () ->
+          process.exit -1
+      else if Object.keys(workers).length == 0
+        process.exit 0
+    ), config.checkInterval
   
   process.on 'SIGUSR1', () ->
     # Reopen all log files

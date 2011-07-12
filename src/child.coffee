@@ -12,7 +12,7 @@ util.inherits Child, events.EventEmitter
 
 Child.prototype.fly = () ->
   cntr = 0
-  console.log "here"
+  process.on "SIGQUIT",  () ->
   net.createServer((socket) =>
     @socket = socket
     socket.on 'data', (data) =>
@@ -36,11 +36,16 @@ Child.prototype.fly = () ->
 
 
 Child.prototype.land = () ->
-  @socket.write("GOODBYE FROM #{process.pid}" + '\n')
-  @socket.end()
+  if @socket.writeable
+    @socket.write("GOODBYE FROM #{process.pid}" + '\n')
+    @socket.end()
   callback = (code) -> process.exit code
   this.emit "exit", callback
   
+
+
+  
+
 
 
 module.exports = Child
