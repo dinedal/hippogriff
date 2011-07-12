@@ -27,16 +27,18 @@ Child.prototype.fly = () ->
           console.log "okay"
           this.land()
   ).listen(process.env['_HIPPOGRIFF_SOCKET'])
-  master_socket = new net.Socket()
-  console.log process.env['_HIPPOGRIFF_MASTER_SOCKET']
-  master_socket.connect process.env['_HIPPOGRIFF_MASTER_SOCKET'], () ->
-    console.log "writing hello"
-    master_socket.write "HELLO MY NAME IS #{process.pid}" + '\n'
-    master_socket.end()
+  process.nextTick () ->
+    master_socket = new net.Socket()
+    console.log process.env['_HIPPOGRIFF_MASTER_SOCKET']
+    master_socket.connect process.env['_HIPPOGRIFF_MASTER_SOCKET'], () ->
+      console.log "writing hello"
+      master_socket.write "HELLO MY NAME IS #{process.pid}" + '\n'
+      master_socket.end()
 
 
 Child.prototype.land = () ->
-  if @socket.writeable
+  console.log "#{process.pid} - Landing! @socket.writable? #{util.inspect @socket.writable}"
+  if @socket.writable
     @socket.write("GOODBYE FROM #{process.pid}" + '\n')
     @socket.end()
   callback = (code) -> process.exit code

@@ -13,6 +13,7 @@ config = {}
 socket_counter = 0
 
 exports.master = (path_to_worker, path_to_config) ->
+  console.log "Master is #{process.pid}"
   # Set defaults
   if path.extname(path_to_worker) == '.coffee'
     config.exec_binary = 'coffee'
@@ -95,15 +96,7 @@ exports.master = (path_to_worker, path_to_config) ->
     console.log 'SIGQUIT - Asking workers to shutdown and then shutting down...'
     clearInterval(child_watcher_id)
     for worker of workers
-      if workers[worker].socket?
-        console.log "Quitting #{worker}"
-        workers[worker].status = "quitting"
-        workers[worker].socket.write("GO AWAY #{worker}" + '\n')
-        workers[worker].socket.end()
-      else
-        # No way to communicate
-        workers[worker].handle.kill("SIGKILL")
-        delete workers[worker]
+      initateGracefulExit worker, config
     counter = 3
     setInterval (() ->
       counter--
@@ -121,8 +114,10 @@ exports.master = (path_to_worker, path_to_config) ->
     # Bring up a copy of this process and workers
     # TBD
   process.on 'SIGWINCH', () ->
-    # Gracefully stop all workers
-    # TBD
+    console.log 'SIGWINCH - Asking workers to shutdown'
+    for worker of workers
+      initateGracefulExit worker, config
+    
   process.on 'SIGTTIN', () ->
     # Increment worker count
     config.workers++
@@ -130,13 +125,33 @@ exports.master = (path_to_worker, path_to_config) ->
   process.on 'SIGTTOU', () ->
     # Decerment worker count
     config.workers--
-    # TBD Graceful exit
-    workers[Object.keys(workers)[0]].handle.kill("SIGKILL")
-    delete workers[worker]
+    initateGracefulExit Object.keys(workers)[0], config
+  
+  process.on 'exit', (code, signal) ->
+    console.log "Master died - #{code} #{signal}"
   
   config
 
 
+initateGracefulExit = (worker, config) ->
+  console.log "Quitting #{worker}"
+  if workers[worker].socket?
+    workers[worker].status = "quitting"
+    workers[worker].socket.write("GO AWAY #{worker}" + '\n')
+    workers[worker].socket.end()
+  else
+    # No way to communicate
+    workers[worker].handle.kill("SIGKILL")
+    delete workers[worker]
+  counter = 3
+  setInterval (() ->
+    counter--
+    if counter == 0 and workers[worker]?
+      workers[worker].handle.kill("SIGKILL")
+      delete workers[worker]
+  ), config.checkInterval
+  
+  
 startWorker = (config, path_to_worker) ->
   if path_to_worker? and path.existsSync path_to_worker
     if path_to_worker[0] == '.'
@@ -152,11 +167,9 @@ startWorker = (config, path_to_worker) ->
     worker.stdout.on 'data', (data) -> process.stdout.write data
     worker.stderr.on 'data', (data) -> process.stderr.write data
     worker.on 'exit', (code) ->
-      if code? and code != 0
+      if code? and code != 0 and workers[worker.pid]? and workers[worker.pid].status != "quitting"
+        delete workers[worker.pid]
         startWorker(config, path_to_worker)
-      else
-        if Object.keys(workers).length == 0
-          process.exit 0
     console.log "Started #{worker.pid}, as #{config.exec_binary} #{path_to_worker}"
     
     workers[worker.pid] = {
