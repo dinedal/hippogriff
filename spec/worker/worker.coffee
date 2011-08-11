@@ -10,3 +10,4 @@ setTimeout (() ->
 
 hippogriff.on 'exit', (callback) ->
   callback 0
+  

@@ -3,6 +3,7 @@ util = require 'util'
 path = require 'path'
 net = require 'net'
 {spawn} = require 'child_process'
+{argv} = require('optimist').usage('Usage: $0 [-config <JSON config object>]')
 
 # process.on 'uncaughtException', (err) ->
 #   console.err 'Caught exception: ' + '\n' + util.inspect(err.stack, false, 6)
@@ -11,6 +12,7 @@ net = require 'net'
 workers = {}
 config = {}
 socket_counter = 0
+new_master = null
 
 exports.master = (path_to_worker, path_to_config) ->
   console.log "Master is #{process.pid}"
@@ -25,6 +27,12 @@ exports.master = (path_to_worker, path_to_config) ->
   
   # Use user provided config for overrides
   config = load_config_file config, path_to_config
+  config.path_to_config = path_to_config
+  
+  # Override all with command line config
+  command_line_config = JSON.parse argv.config
+  for key of command_line_config
+    config[key] = command_line_config[key]
   
   # Start unix server for workers to report in
   net.createServer((socket) ->
@@ -58,6 +66,8 @@ exports.master = (path_to_worker, path_to_config) ->
   # Monitoring of children
   monitorChildren = () ->
     setInterval (() ->
+      if Object.keys(workers).length == 0
+        process.exit 0
       new_workers = []
       for worker of workers
         if workers[worker].socket?
@@ -83,7 +93,17 @@ exports.master = (path_to_worker, path_to_config) ->
   # Match Unicorn's signal handling
   process.on 'SIGHUP', () ->
     # Reload config, gracefully restart all workers
-    # TBD
+    # Set defaults
+    if path.extname(path_to_worker) == '.coffee'
+      config.exec_binary = 'coffee'
+    else
+      config.exec_binary = 'node'
+    config.workers = 2
+    config.socket = "/tmp/hippogriff.sock"
+    config.checkInterval = 1000
+    
+    config = load_config_file config, config.path_to_config
+    
   
   quickshutdown = () ->
     forceWorkerShutdown () ->
@@ -110,9 +130,26 @@ exports.master = (path_to_worker, path_to_config) ->
   process.on 'SIGUSR1', () ->
     # Reopen all log files
     # TBD
+  
   process.on 'SIGUSR2', () ->
     # Bring up a copy of this process and workers
-    # TBD
+    console.log 'Copying myself...'
+    new_master = spawn "#{process.argv[0]}", ["#{process.argv[1]}", "--config '#{JSON.stringify config}'"], {cwd:process.cwd()}
+    new_master.stdout.on 'data', (data) -> process.stdout.write data
+    new_master.stderr.on 'data', (data) -> process.stderr.write data
+    new_master.on 'exit', (code) -> process.exit code
+    # Force graceful shutdown of all workers
+    clearInterval(child_watcher_id)
+    for worker of workers
+      initateGracefulExit worker, config
+    counter = 3
+    setInterval (() ->
+      counter--
+      if counter == 0
+        forceWorkerShutdown () ->
+          workers = {}
+    ), config.checkInterval
+  
   process.on 'SIGWINCH', () ->
     console.log 'SIGWINCH - Asking workers to shutdown'
     for worker of workers
@@ -122,6 +159,7 @@ exports.master = (path_to_worker, path_to_config) ->
     # Increment worker count
     config.workers++
     startWorker config, path_to_worker
+  
   process.on 'SIGTTOU', () ->
     # Decerment worker count
     config.workers--
@@ -167,7 +205,7 @@ startWorker = (config, path_to_worker) ->
     worker.stdout.on 'data', (data) -> process.stdout.write data
     worker.stderr.on 'data', (data) -> process.stderr.write data
     worker.on 'exit', (code) ->
-      if code? and code != 0 and workers[worker.pid]? and workers[worker.pid].status != "quitting"
+      if workers[worker.pid]? and workers[worker.pid].status != "quitting"
         delete workers[worker.pid]
         startWorker(config, path_to_worker)
     console.log "Started #{worker.pid}, as #{config.exec_binary} #{path_to_worker}"

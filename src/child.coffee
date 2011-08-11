@@ -37,12 +37,16 @@ Child.prototype.fly = () ->
 
 
 Child.prototype.land = () ->
+  self = @
   console.log "#{process.pid} - Landing! @socket.writable? #{util.inspect @socket.writable}"
-  if @socket.writable
-    @socket.write("GOODBYE FROM #{process.pid}" + '\n')
+  callback = (code) =>
+    code ||= 0
+    console.log "Callback called #{@socket.writable}"
+    @socket.write("GOODBYE FROM #{process.pid}" + '\n') if @socket? and @socket.writable
     @socket.end()
-  callback = (code) -> process.exit code
+    process.exit code
   this.emit "exit", callback
+  
   
 
 
