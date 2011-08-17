@@ -6,7 +6,7 @@ hippogriff = new Hippogriff()
 setTimeout (() -> 
   console.log "Done!"
   hippogriff.land()
-), 5000
+), 10000
 
 hippogriff.on 'exit', (callback) ->
   callback 0

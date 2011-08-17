@@ -3,7 +3,7 @@ util = require 'util'
 path = require 'path'
 net = require 'net'
 {spawn} = require 'child_process'
-{argv} = require('optimist').usage('Usage: $0 [-config <JSON config object>]')
+{argv} = require('optimist').usage('Usage: $0 --worker <worker.js|coffee> [--config <JSON config object>]')
 
 # process.on 'uncaughtException', (err) ->
 #   console.err 'Caught exception: ' + '\n' + util.inspect(err.stack, false, 6)
@@ -16,12 +16,13 @@ new_master = null
 
 exports.master = (path_to_worker, path_to_config) ->
   console.log "Master is #{process.pid}"
+  path_to_worker = argv.worker if argv.worker?
   # Set defaults
   if path.extname(path_to_worker) == '.coffee'
     config.exec_binary = 'coffee'
   else
     config.exec_binary = 'node'
-  config.workers = 2
+  config.workers = 1
   config.socket = "/tmp/hippogriff.sock"
   config.checkInterval = 1000
   
@@ -30,11 +31,13 @@ exports.master = (path_to_worker, path_to_config) ->
   config.path_to_config = path_to_config
   
   # Override all with command line config
-  command_line_config = JSON.parse argv.config
+  command_line_config = if argv.config? then JSON.parse argv.config else {}
   for key of command_line_config
     config[key] = command_line_config[key]
   
-  # Start unix server for workers to report in
+  console.log path_to_worker
+  
+  # Start unix socket server for workers to report in
   net.createServer((socket) ->
     socket.on "data", (data) ->
       data = data.toString()
@@ -134,7 +137,7 @@ exports.master = (path_to_worker, path_to_config) ->
   process.on 'SIGUSR2', () ->
     # Bring up a copy of this process and workers
     console.log 'Copying myself...'
-    new_master = spawn "#{process.argv[0]}", ["#{process.argv[1]}", "--config '#{JSON.stringify config}'"], {cwd:process.cwd()}
+    new_master = spawn "#{process.argv[0]}", ["#{argv.worker}", "--config '#{JSON.stringify config}'"], {cwd:process.cwd()}
     new_master.stdout.on 'data', (data) -> process.stdout.write data
     new_master.stderr.on 'data', (data) -> process.stderr.write data
     new_master.on 'exit', (code) -> process.exit code
@@ -226,4 +229,4 @@ load_config_file = (defaults, path_to_config) ->
       config[key] = value
   config
 
-exports.master './spec/worker/worker.coffee'
+exports.master()
