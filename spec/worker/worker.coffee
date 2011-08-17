@@ -1,4 +1,4 @@
-Hippogriff = require '/Users/pbergeron/Sites/hippogriff/src/child'
+Hippogriff = require '/Users/pbergeron/Sites/hippogriff/src/hippogriff'
 
 
 console.log "Starting..."

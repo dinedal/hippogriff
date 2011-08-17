@@ -6,6 +6,9 @@
 "contributors":["Paul Bergeron"],
 "keywords":["process","workers","management","http","unicorn"],
 "main":"./lib/hippogriff.js",
+"bin": {
+    "hippogriff": "./bin/hippogriff"
+  },
 "engines":{
   "node":">= 0.4.8"
   },

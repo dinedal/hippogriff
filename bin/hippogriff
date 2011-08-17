@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+
+var argv, hippogriff_rider;
+
+hippogriff_rider = require('../lib/hippogriff_rider');
+
+argv = require('optimist').usage('Usage: $0 --worker <worker.js|coffee> [--config <JSON config object>] [--config_file <config.json>]').argv;
+
+hippogriff_rider.master(argv.worker, argv.config, argv.config_file);
